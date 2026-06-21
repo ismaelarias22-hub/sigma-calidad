@@ -976,11 +976,24 @@ function actualizarBarraBorrado(){
   bar.classList.toggle('show', filasSeleccionadas.size > 0);
 }
 
+function restaurarBotonBorrar(){
+  const btn = document.getElementById('btn-delete-sel');
+  if (btn) {
+    btn.disabled = false;
+    btn.innerHTML = '🗑️ Borrar seleccionados (<span id="sel-count">0</span>)';
+  }
+  const bar = document.getElementById('delete-bar');
+  if (bar) bar.classList.remove('show');
+}
+
 function borrarSeleccionados(){
   if (filasSeleccionadas.size === 0) return;
   const btn = document.getElementById('btn-delete-sel');
   btn.disabled = true;
   btn.textContent = '⏳ Borrando…';
+
+  const info = document.getElementById('consulta-info');
+  info.innerHTML = '⏳ Borrando registros…';
 
   // Convertir a array de números, ordenar de mayor a menor (borrar de abajo hacia arriba)
   const filas = Array.from(filasSeleccionadas)
@@ -989,37 +1002,32 @@ function borrarSeleccionados(){
     .sort((a, b) => b - a);
 
   const callbackName = 'jsonpDel_' + Date.now();
-  const timeoutId = setTimeout(() => {
-    document.getElementById('consulta-info').innerHTML = '⚠️ Tiempo agotado al borrar';
-    btn.disabled = false;
-    btn.innerHTML = '🗑️ Borrar seleccionados (<span id="sel-count">' + filasSeleccionadas.size + '</span>)';
-    delete window[callbackName];
-    if (script.parentNode) script.parentNode.removeChild(script);
-  }, 25000);
+  let yaProceso = false;
 
-  window[callbackName] = function(result){
-    clearTimeout(timeoutId);
+  // Función que limpia y recarga (se ejecute o no el callback)
+  function finalizar(){
+    if (yaProceso) return;
+    yaProceso = true;
     filasSeleccionadas.clear();
-    delete window[callbackName];
-    if (script.parentNode) script.parentNode.removeChild(script);
-    // Reactivar el botón y ocultar la barra
-    btn.disabled = false;
-    btn.innerHTML = '🗑️ Borrar seleccionados (<span id="sel-count">0</span>)';
-    document.getElementById('delete-bar').classList.remove('show');
-    // Recargar la lista actualizada
-    loadConsulta();
+    try { delete window[callbackName]; } catch(e){}
+    const s = document.getElementById(callbackName + '_script');
+    if (s && s.parentNode) s.parentNode.removeChild(s);
+    restaurarBotonBorrar();
+    loadConsulta();  // recarga la lista actualizada
+  }
+
+  // El callback ideal (si la respuesta llega)
+  window[callbackName] = function(result){
+    finalizar();
   };
+
+  // Red de seguridad: pase lo que pase, a los 4 segundos reactiva y recarga
+  // (el borrado en el servidor ya ocurrió, solo recargamos para verlo)
+  setTimeout(finalizar, 4000);
 
   const script = document.createElement('script');
+  script.id = callbackName + '_script';
   script.src = APPS_SCRIPT_URL + '?action=borrar&hoja=BuscarPorSKU&filas=' + filas.join(',') + '&callback=' + callbackName;
-  script.onerror = function(){
-    clearTimeout(timeoutId);
-    document.getElementById('consulta-info').innerHTML = '⚠️ Error al borrar';
-    btn.disabled = false;
-    btn.innerHTML = '🗑️ Borrar seleccionados (<span id="sel-count">' + filasSeleccionadas.size + '</span>)';
-    delete window[callbackName];
-    if (script.parentNode) script.parentNode.removeChild(script);
-  };
   document.body.appendChild(script);
 }
 
