@@ -243,6 +243,28 @@ body {
   border-top: 1px solid #e9d5ff;
 }
 .pesos-consulta-stats strong { color: #4c1d95; }
+.pr-check {
+  width: 22px; height: 22px; cursor: pointer;
+  accent-color: #dc2626; flex-shrink: 0;
+}
+.product-result.selected {
+  border-left-color: #dc2626;
+  background: #fef2f2;
+}
+.delete-bar {
+  position: sticky; top: 0; z-index: 50;
+  background: #fff; padding: 10px 0; margin-bottom: 10px;
+  display: none;
+}
+.delete-bar.show { display: block; }
+.btn-delete-sel {
+  width: 100%; padding: 13px;
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  color: white; border: none; border-radius: 10px;
+  font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit;
+}
+.btn-delete-sel:disabled { opacity: 0.6; cursor: wait; }
+.pr-header-left { display: flex; align-items: center; gap: 10px; }
 .footer { text-align: center; margin-top: 18px; font-size: 11px; color: #64748b; }
 </style>
 </head>
@@ -395,6 +417,11 @@ body {
       </div>
     </div>
     <div id="consulta-info" class="results-info">📊 Toca "Cargar / Actualizar"</div>
+    <div class="delete-bar" id="delete-bar">
+      <button class="btn-delete-sel" id="btn-delete-sel" onclick="borrarSeleccionados()">
+        🗑️ Borrar seleccionados (<span id="sel-count">0</span>)
+      </button>
+    </div>
     <div id="consulta-results"></div>
   </div>
 
@@ -785,6 +812,7 @@ function loadConsulta(){
     try {
       if (data.result === 'ok' && Array.isArray(data.rows)) {
         consultaData = data.rows;
+        filasSeleccionadas.clear();
         const maqSet = new Set();
         consultaData.forEach(r => { if (r.maquina) maqSet.add(r.maquina); });
         const maqSelect = document.getElementById('filter-maquina');
@@ -892,9 +920,12 @@ function renderConsulta(){
       }
     }
     return `
-    <div class="product-result">
+    <div class="product-result" data-fila="${r.fila || ''}">
       <div class="pr-header">
-        <span class="pr-sku">${r.sku || '—'}</span>
+        <div class="pr-header-left">
+          <input type="checkbox" class="pr-check" data-fila="${r.fila || ''}" onchange="toggleSeleccion(this)">
+          <span class="pr-sku">${r.sku || '—'}</span>
+        </div>
         <span class="pr-fecha">📅 ${normalizarFecha(r.dia)} ${r.hora ? '· ' + r.hora : ''}</span>
       </div>
       <div class="pr-desc">${r.descripcion || '—'}</div>
@@ -919,6 +950,73 @@ function renderConsulta(){
       ${pesosHtml}
     </div>
   `;}).join('');
+
+  // Re-aplicar selección visual y actualizar barra
+  actualizarBarraBorrado();
+}
+
+let filasSeleccionadas = new Set();
+
+function toggleSeleccion(checkbox){
+  const fila = checkbox.getAttribute('data-fila');
+  if (checkbox.checked) {
+    filasSeleccionadas.add(fila);
+    checkbox.closest('.product-result').classList.add('selected');
+  } else {
+    filasSeleccionadas.delete(fila);
+    checkbox.closest('.product-result').classList.remove('selected');
+  }
+  actualizarBarraBorrado();
+}
+
+function actualizarBarraBorrado(){
+  const bar = document.getElementById('delete-bar');
+  const count = document.getElementById('sel-count');
+  count.textContent = filasSeleccionadas.size;
+  bar.classList.toggle('show', filasSeleccionadas.size > 0);
+}
+
+function borrarSeleccionados(){
+  if (filasSeleccionadas.size === 0) return;
+  const btn = document.getElementById('btn-delete-sel');
+  btn.disabled = true;
+  btn.textContent = '⏳ Borrando…';
+
+  // Convertir a array de números, ordenar de mayor a menor (borrar de abajo hacia arriba)
+  const filas = Array.from(filasSeleccionadas)
+    .map(f => parseInt(f, 10))
+    .filter(f => !isNaN(f))
+    .sort((a, b) => b - a);
+
+  const callbackName = 'jsonpDel_' + Date.now();
+  const timeoutId = setTimeout(() => {
+    document.getElementById('consulta-info').innerHTML = '⚠️ Tiempo agotado al borrar';
+    btn.disabled = false;
+    btn.textContent = '🗑️ Borrar seleccionados (' + filasSeleccionadas.size + ')';
+    delete window[callbackName];
+    if (script.parentNode) script.parentNode.removeChild(script);
+  }, 25000);
+
+  window[callbackName] = function(result){
+    clearTimeout(timeoutId);
+    filasSeleccionadas.clear();
+    delete window[callbackName];
+    if (script.parentNode) script.parentNode.removeChild(script);
+    // Recargar la lista actualizada
+    loadConsulta();
+  };
+
+  const script = document.createElement('script');
+  script.src = APPS_SCRIPT_URL + '?action=borrar&hoja=BuscarPorSKU&filas=' + filas.join(',') + '&callback=' + callbackName;
+  script.onerror = function(){
+    clearTimeout(timeoutId);
+    document.getElementById('consulta-info').innerHTML = '⚠️ Error al borrar';
+    btn.disabled = false;
+    btn.textContent = '🗑️ Borrar seleccionados (' + filasSeleccionadas.size + ')';
+    delete window[callbackName];
+    if (script.parentNode) script.parentNode.removeChild(script);
+  };
+  document.body.appendChild(script);
 }
 
 // Sincronizar display de fecha dd/mm/yyyy
