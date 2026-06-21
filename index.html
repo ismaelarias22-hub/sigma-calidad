@@ -992,7 +992,7 @@ function borrarSeleccionados(){
   const timeoutId = setTimeout(() => {
     document.getElementById('consulta-info').innerHTML = '⚠️ Tiempo agotado al borrar';
     btn.disabled = false;
-    btn.textContent = '🗑️ Borrar seleccionados (' + filasSeleccionadas.size + ')';
+    btn.innerHTML = '🗑️ Borrar seleccionados (<span id="sel-count">' + filasSeleccionadas.size + '</span>)';
     delete window[callbackName];
     if (script.parentNode) script.parentNode.removeChild(script);
   }, 25000);
@@ -1002,6 +1002,10 @@ function borrarSeleccionados(){
     filasSeleccionadas.clear();
     delete window[callbackName];
     if (script.parentNode) script.parentNode.removeChild(script);
+    // Reactivar el botón y ocultar la barra
+    btn.disabled = false;
+    btn.innerHTML = '🗑️ Borrar seleccionados (<span id="sel-count">0</span>)';
+    document.getElementById('delete-bar').classList.remove('show');
     // Recargar la lista actualizada
     loadConsulta();
   };
@@ -1012,7 +1016,7 @@ function borrarSeleccionados(){
     clearTimeout(timeoutId);
     document.getElementById('consulta-info').innerHTML = '⚠️ Error al borrar';
     btn.disabled = false;
-    btn.textContent = '🗑️ Borrar seleccionados (' + filasSeleccionadas.size + ')';
+    btn.innerHTML = '🗑️ Borrar seleccionados (<span id="sel-count">' + filasSeleccionadas.size + '</span>)';
     delete window[callbackName];
     if (script.parentNode) script.parentNode.removeChild(script);
   };
