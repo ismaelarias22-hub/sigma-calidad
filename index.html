@@ -799,7 +799,7 @@ document.getElementById('form-registrar').addEventListener('submit', function(e)
 
 // Envía los 10 pesos al Google Sheets separado de pesos
 function enviarPesosASheets(sku, lote, maquina, dia){
-  if (!PESOS_SCRIPT_URL || PESOS_SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbwfDSn0AC9cVUx__3h6ouQvAQEM4tVC8ac_9lNle34tF0DnDY6KHio2uF23zewbF3c6/exec') return;
+  if (!PESOS_SCRIPT_URL) return;
   const pesos = Array.from(document.querySelectorAll('.peso-field')).map(el => el.value);
   const tienePesos = pesos.some(v => v && parseFloat(v) > 0);
   if (!tienePesos) return;
@@ -828,7 +828,7 @@ function enviarPesosASheets(sku, lote, maquina, dia){
 
 // Trae todos los pesos guardados del Sheets de pesos (para mostrar en consulta)
 function cargarPesosDesdeSheets(callback){
-  if (!PESOS_SCRIPT_URL || PESOS_SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbwfDSn0AC9cVUx__3h6ouQvAQEM4tVC8ac_9lNle34tF0DnDY6KHio2uF23zewbF3c6/exec') {
+  if (!PESOS_SCRIPT_URL) {
     if (callback) callback();
     return;
   }
