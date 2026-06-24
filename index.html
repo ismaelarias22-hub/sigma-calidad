@@ -865,53 +865,97 @@ function loadConsulta(){
   btn.textContent = '⏳ Cargando…';
   info.innerHTML = '⏳ Consultando…';
 
-  // JSONP: esquiva el bloqueo CORS de GitHub Pages
-  const callbackName = 'jsonpCallback_' + Date.now();
-  const timeoutId = setTimeout(() => {
-    info.innerHTML = '⚠️ Tiempo de espera agotado. Reintenta.';
-    btn.disabled = false;
-    btn.textContent = '🔄 Cargar / Actualizar registros';
-    delete window[callbackName];
-    if (script.parentNode) script.parentNode.removeChild(script);
-  }, 20000);
+  // ── Las dos llamadas salen EN PARALELO ──
+  let registrosListos = false;
+  let pesosListos = false;
+  let registrosOk = false;
 
-  window[callbackName] = function(data){
-    clearTimeout(timeoutId);
-    try {
-      if (data.result === 'ok' && Array.isArray(data.rows)) {
-        consultaData = data.rows;
-        filasSeleccionadas.clear();
-        const maqSet = new Set();
-        consultaData.forEach(r => { if (r.maquina) maqSet.add(r.maquina); });
-        const maqSelect = document.getElementById('filter-maquina');
-        maqSelect.innerHTML = '<option value="">Todas</option>' +
-          Array.from(maqSet).sort().map(m => `<option value="${m}">${m}</option>`).join('');
-        // Cargar pesos del Sheets antes de renderizar
-        cargarPesosDesdeSheets(() => renderConsulta());
-      } else {
-        info.innerHTML = '⚠️ ' + (data.message || 'Error');
-      }
-    } catch (e) {
-      info.innerHTML = '⚠️ Error: ' + e.message;
-    } finally {
+  function intentarRenderizar(){
+    if (registrosListos && pesosListos) {
       btn.disabled = false;
       btn.textContent = '🔄 Cargar / Actualizar registros';
-      delete window[callbackName];
-      if (script.parentNode) script.parentNode.removeChild(script);
+      if (registrosOk) {
+        renderConsulta();
+      } else {
+        info.innerHTML = '⚠️ No se pudieron cargar los registros';
+      }
     }
-  };
+  }
 
-  const script = document.createElement('script');
-  script.src = APPS_SCRIPT_URL + '?action=list&hoja=BuscarPorSKU&callback=' + callbackName;
-  script.onerror = function(){
-    clearTimeout(timeoutId);
-    info.innerHTML = '⚠️ No se pudo conectar con Google Sheets';
-    btn.disabled = false;
-    btn.textContent = '🔄 Cargar / Actualizar registros';
-    delete window[callbackName];
-    if (script.parentNode) script.parentNode.removeChild(script);
+  // ─── Llamada 1: registros de Buscar por SKU ───
+  const cbReg = 'jsonpCallback_' + Date.now();
+  const scriptReg = document.createElement('script');
+  const timeoutReg = setTimeout(() => {
+    registrosListos = true;
+    if (scriptReg.parentNode) scriptReg.parentNode.removeChild(scriptReg);
+    delete window[cbReg];
+    intentarRenderizar();
+  }, 20000);
+
+  window[cbReg] = function(data){
+    clearTimeout(timeoutReg);
+    if (data.result === 'ok' && Array.isArray(data.rows)) {
+      consultaData = data.rows;
+      registrosOk = true;
+      filasSeleccionadas.clear();
+      const maqSet = new Set();
+      consultaData.forEach(r => { if (r.maquina) maqSet.add(r.maquina); });
+      const maqSelect = document.getElementById('filter-maquina');
+      maqSelect.innerHTML = '<option value="">Todas</option>' +
+        Array.from(maqSet).sort().map(m => `<option value="${m}">${m}</option>`).join('');
+    }
+    registrosListos = true;
+    delete window[cbReg];
+    if (scriptReg.parentNode) scriptReg.parentNode.removeChild(scriptReg);
+    intentarRenderizar();
   };
-  document.body.appendChild(script);
+  scriptReg.src = APPS_SCRIPT_URL + '?action=list&hoja=BuscarPorSKU&callback=' + cbReg;
+  scriptReg.onerror = function(){
+    clearTimeout(timeoutReg);
+    registrosListos = true;
+    delete window[cbReg];
+    if (scriptReg.parentNode) scriptReg.parentNode.removeChild(scriptReg);
+    intentarRenderizar();
+  };
+  document.body.appendChild(scriptReg);
+
+  // ─── Llamada 2: pesos del Sheets (al mismo tiempo) ───
+  if (!PESOS_SCRIPT_URL || PESOS_SCRIPT_URL === 'PEGAR_URL_PESOS_AQUI') {
+    pesosListos = true;
+  } else {
+    const cbPesos = 'jsonpListPesos_' + Date.now();
+    const scriptPesos = document.createElement('script');
+    const timeoutPesos = setTimeout(() => {
+      pesosListos = true;
+      if (scriptPesos.parentNode) scriptPesos.parentNode.removeChild(scriptPesos);
+      delete window[cbPesos];
+      intentarRenderizar();
+    }, 20000);
+
+    window[cbPesos] = function(data){
+      clearTimeout(timeoutPesos);
+      if (data && data.result === 'ok' && Array.isArray(data.rows)) {
+        pesosDesdeSheets = {};
+        data.rows.forEach(r => {
+          const clave = (String(r.sku).trim() + '|' + String(r.lote).trim()).toUpperCase().replace(/\\s+/g,'');
+          pesosDesdeSheets[clave] = r.pesos || [];
+        });
+      }
+      pesosListos = true;
+      delete window[cbPesos];
+      if (scriptPesos.parentNode) scriptPesos.parentNode.removeChild(scriptPesos);
+      intentarRenderizar();
+    };
+    scriptPesos.src = PESOS_SCRIPT_URL + '?action=list_pesos&callback=' + cbPesos;
+    scriptPesos.onerror = function(){
+      clearTimeout(timeoutPesos);
+      pesosListos = true;
+      delete window[cbPesos];
+      if (scriptPesos.parentNode) scriptPesos.parentNode.removeChild(scriptPesos);
+      intentarRenderizar();
+    };
+    document.body.appendChild(scriptPesos);
+  }
 }
 
 // Convierte cualquier formato de fecha a dd/mm/aaaa
