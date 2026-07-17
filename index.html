@@ -1385,35 +1385,64 @@ function quitarFoto(i) {
 }
 
 // Envía las fotos al Apps Script (que las guarda en Drive)
-async function enviarFotosADriveLista(lista, sku, lote, dia) {
-  if (!lista || lista.length === 0) return;
-  if (!FOTOS_SCRIPT_URL || FOTOS_SCRIPT_URL === 'PEGAR_URL_FOTOS_AQUI') return;
+function enviarFotosADriveLista(lista, sku, lote, dia) {
+  return new Promise((resolve) => {
+    if (!lista || lista.length === 0) { resolve(); return; }
+    if (!FOTOS_SCRIPT_URL || FOTOS_SCRIPT_URL === 'PEGAR_URL_FOTOS_AQUI') { resolve(); return; }
 
-  const total = lista.length;
-  // Enviar cada foto con fetch como JSON (funciona en navegador Y en el APK, soporta fotos grandes)
-  for (let idx = 0; idx < lista.length; idx++) {
-    const foto = lista[idx];
-    const cuerpo = JSON.stringify({
-      modo: 'guardar_foto',
-      sku: sku || '',
-      lote: lote || '',
-      dia: dia || '',
-      indice: (idx + 1),
-      total: total,
-      foto: foto.dataUrl
+    const total = lista.length;
+    let enviadas = 0;
+
+    // Un iframe oculto compartido para recibir las respuestas
+    lista.forEach((foto, idx) => {
+      // Cada foto va en su propio formulario que apunta a un iframe oculto
+      const iframe = document.createElement('iframe');
+      iframe.name = 'ifoto_' + Date.now() + '_' + idx;
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = FOTOS_SCRIPT_URL;
+      form.target = iframe.name;
+      form.style.display = 'none';
+      form.enctype = 'application/x-www-form-urlencoded';
+
+      const campos = {
+        modo: 'guardar_foto',
+        sku: sku || '',
+        lote: lote || '',
+        dia: dia || '',
+        indice: (idx + 1),
+        total: total,
+        foto: foto.dataUrl
+      };
+      for (const k in campos) {
+        const input = document.createElement('textarea');
+        input.name = k;
+        input.value = campos[k];
+        form.appendChild(input);
+      }
+
+      document.body.appendChild(form);
+      form.submit();
+
+      // No dependemos de iframe.onload (con Apps Script no siempre dispara).
+      // Asumimos el envío tras un tiempo prudente y resolvemos.
+      let yaContada = false;
+      const limpiar = () => {
+        if (yaContada) return;
+        yaContada = true;
+        enviadas++;
+        try { if (form.parentNode) form.parentNode.removeChild(form); } catch(e){}
+        setTimeout(() => { try { if (iframe.parentNode) iframe.parentNode.removeChild(iframe); } catch(e){} }, 2000);
+        if (enviadas >= total) resolve();
+      };
+      iframe.onload = limpiar;
+      // Red de seguridad principal: cada foto se da por enviada tras 4s
+      setTimeout(limpiar, 4000 + idx * 2500);
     });
-
-    try {
-      await fetch(FOTOS_SCRIPT_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: cuerpo
-      });
-    } catch (e) {
-      console.log('Error enviando foto ' + (idx+1) + ':', e);
-    }
-  }
+  });
 }
 
 </script>
