@@ -1386,51 +1386,64 @@ function quitarFoto(i) {
 
 // Envía las fotos al Apps Script (que las guarda en Drive)
 async function enviarFotosADriveLista(lista, sku, lote, dia) {
-  if (!lista || lista.length === 0) return;
-  if (!FOTOS_SCRIPT_URL || FOTOS_SCRIPT_URL === 'PEGAR_URL_FOTOS_AQUI') return;
+  const det = document.getElementById('success-detail');
+  function diag(msg) {
+    if (det) det.innerHTML += '<br>📷 ' + msg;
+  }
+
+  if (!lista || lista.length === 0) { diag('Sin fotos que enviar'); return; }
+  if (!FOTOS_SCRIPT_URL || FOTOS_SCRIPT_URL === 'PEGAR_URL_FOTOS_AQUI') {
+    diag('⚠️ URL de fotos no configurada'); return;
+  }
 
   const total = lista.length;
+  diag('Iniciando envío de ' + total + ' foto(s)...');
 
-  // Enviar cada foto, una por una, esperando cada respuesta.
-  // Se usa Content-Type text/plain: Apps Script lo lee como JSON en e.postData,
-  // y NO dispara preflight CORS, por lo que funciona en navegador Y en el APK (TWA).
+  let ok = 0, fail = 0;
+
   for (let idx = 0; idx < lista.length; idx++) {
     const foto = lista[idx];
+    const tam = Math.round((foto.dataUrl.length) / 1024);
     const cuerpo = JSON.stringify({
       modo: 'guardar_foto',
-      sku: sku || '',
-      lote: lote || '',
-      dia: dia || '',
-      indice: (idx + 1),
-      total: total,
-      foto: foto.dataUrl
+      sku: sku || '', lote: lote || '', dia: dia || '',
+      indice: (idx + 1), total: total, foto: foto.dataUrl
     });
 
     try {
-      // Sin mode:no-cors → la petición se completa de verdad y espera la respuesta.
-      // Apps Script permite esto porque responde con el CORS correcto en text/plain.
+      diag('Enviando foto ' + (idx+1) + ' (' + tam + ' KB)...');
       const resp = await fetch(FOTOS_SCRIPT_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: cuerpo,
         redirect: 'follow'
       });
-      // Intentar leer la respuesta (si CORS lo permite)
-      try { await resp.text(); } catch (e) {}
+      let txt = '';
+      try { txt = await resp.text(); } catch (e) { txt = '(no se pudo leer respuesta)'; }
+      if (txt.indexOf('"result":"ok"') !== -1) {
+        ok++;
+        diag('✅ Foto ' + (idx+1) + ' guardada');
+      } else {
+        ok++;
+        diag('✅ Foto ' + (idx+1) + ' enviada (resp: ' + txt.substring(0,40) + ')');
+      }
     } catch (e) {
-      // Si el fetch normal falla (algún navegador estricto), reintentar con no-cors
+      diag('⚠️ fetch normal falló: ' + e.message + ' — reintentando...');
       try {
         await fetch(FOTOS_SCRIPT_URL, {
-          method: 'POST',
-          mode: 'no-cors',
+          method: 'POST', mode: 'no-cors',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: cuerpo
         });
+        ok++;
+        diag('✅ Foto ' + (idx+1) + ' enviada (no-cors)');
       } catch (e2) {
-        console.log('Error enviando foto ' + (idx + 1) + ':', e2);
+        fail++;
+        diag('❌ Foto ' + (idx+1) + ' FALLÓ: ' + e2.message);
       }
     }
   }
+  diag('Terminado: ' + ok + ' enviadas, ' + fail + ' fallidas');
 }
 
 </script>
