@@ -1,6 +1,6 @@
 // Service Worker — Producción Diaria Sigma
 // v3 - fuerza actualización y prioriza red para el HTML
-const CACHE_NAME = 'produccion-sigma-v3';
+const CACHE_NAME = 'produccion-sigma-v4';
 
 self.addEventListener('install', (event) => {
   // Activar inmediatamente la versión nueva

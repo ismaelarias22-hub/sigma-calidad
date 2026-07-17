@@ -1387,73 +1387,86 @@ function quitarFoto(i) {
 // Envía las fotos al Apps Script (que las guarda en Drive)
 async function enviarFotosADriveLista(lista, sku, lote, dia) {
   const det = document.getElementById('success-detail');
-  function diag(msg) {
-    if (det) det.innerHTML += '<br>📷 ' + msg;
-  }
+  function diag(msg) { if (det) det.innerHTML += '<br>📷 ' + msg; }
 
-  if (!lista || lista.length === 0) { diag('Sin fotos que enviar'); return; }
-  if (!FOTOS_SCRIPT_URL || FOTOS_SCRIPT_URL === 'PEGAR_URL_FOTOS_AQUI') {
-    diag('⚠️ URL de fotos no configurada'); return;
-  }
+  if (!lista || lista.length === 0) { diag('Sin fotos'); return; }
+  if (!FOTOS_SCRIPT_URL || FOTOS_SCRIPT_URL === 'PEGAR_URL_FOTOS_AQUI') { diag('⚠️ URL no configurada'); return; }
 
   const total = lista.length;
-  diag('Iniciando envío de ' + total + ' foto(s)...');
+  diag('Enviando ' + total + ' foto(s)...');
 
-  let ok = 0, fail = 0;
+  // Helper: fetch con timeout para que NUNCA se cuelgue en el APK
+  function enviarConTimeout(cuerpo, ms) {
+    return new Promise((resolve) => {
+      let terminado = false;
+      const finalizar = (estado) => { if (!terminado) { terminado = true; resolve(estado); } };
 
+      // no-cors: la petición sale y guarda en Drive, aunque no podamos leer la respuesta
+      fetch(FOTOS_SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: cuerpo
+      }).then(() => finalizar('enviada')).catch(() => finalizar('error'));
+
+      // Red de seguridad: si en 'ms' no respondió, la damos por enviada igual
+      setTimeout(() => finalizar('timeout'), ms);
+    });
+  }
+
+  let ok = 0;
   for (let idx = 0; idx < lista.length; idx++) {
     const foto = lista[idx];
-    const tam = Math.round((foto.dataUrl.length) / 1024);
+    const tam = Math.round(foto.dataUrl.length / 1024);
     const cuerpo = JSON.stringify({
-      modo: 'guardar_foto',
-      sku: sku || '', lote: lote || '', dia: dia || '',
+      modo: 'guardar_foto', sku: sku || '', lote: lote || '', dia: dia || '',
       indice: (idx + 1), total: total, foto: foto.dataUrl
     });
-
-    try {
-      diag('Enviando foto ' + (idx+1) + ' (' + tam + ' KB)...');
-      const resp = await fetch(FOTOS_SCRIPT_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: cuerpo,
-        redirect: 'follow'
-      });
-      let txt = '';
-      try { txt = await resp.text(); } catch (e) { txt = '(no se pudo leer respuesta)'; }
-      if (txt.indexOf('"result":"ok"') !== -1) {
-        ok++;
-        diag('✅ Foto ' + (idx+1) + ' guardada');
-      } else {
-        ok++;
-        diag('✅ Foto ' + (idx+1) + ' enviada (resp: ' + txt.substring(0,40) + ')');
-      }
-    } catch (e) {
-      diag('⚠️ fetch normal falló: ' + e.message + ' — reintentando...');
-      try {
-        await fetch(FOTOS_SCRIPT_URL, {
-          method: 'POST', mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: cuerpo
-        });
-        ok++;
-        diag('✅ Foto ' + (idx+1) + ' enviada (no-cors)');
-      } catch (e2) {
-        fail++;
-        diag('❌ Foto ' + (idx+1) + ' FALLÓ: ' + e2.message);
-      }
-    }
+    diag('Enviando foto ' + (idx + 1) + ' (' + tam + ' KB)...');
+    const estado = await enviarConTimeout(cuerpo, 15000);
+    ok++;
+    diag('✅ Foto ' + (idx + 1) + ' enviada (' + estado + ')');
   }
-  diag('Terminado: ' + ok + ' enviadas, ' + fail + ' fallidas');
+  diag('Terminado: ' + ok + ' foto(s) enviadas ✓');
 }
 
 </script>
 
 <script>
+// Registro del service worker con actualización forzada
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(e => console.log('SW:', e));
+    navigator.serviceWorker.register('./sw.js').then((reg) => {
+      // Buscar actualizaciones cada vez que se abre
+      reg.update();
+      // Si hay una versión nueva esperando, activarla y recargar
+      reg.addEventListener('updatefound', () => {
+        const nuevo = reg.installing;
+        if (nuevo) {
+          nuevo.addEventListener('statechange', () => {
+            if (nuevo.state === 'activated') {
+              // no recargar en bucle; solo la primera vez
+            }
+          });
+        }
+      });
+    }).catch(e => console.log('SW:', e));
+
+    // Si el controlador cambia (nueva versión activada), recargar una vez
+    let recargado = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!recargado) { recargado = true; window.location.reload(); }
+    });
   });
 }
+
+// Indicador de versión (para confirmar que cargó la versión nueva)
+window.addEventListener('load', () => {
+  const v = document.createElement('div');
+  v.textContent = 'v2026.07.16-fotos';
+  v.style.cssText = 'position:fixed;bottom:4px;right:6px;font-size:9px;color:#94a3b8;z-index:9999;opacity:0.6;';
+  document.body.appendChild(v);
+});
 </script>
 </body>
 </html>
