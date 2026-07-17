@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prueba de Fotos</title>
+<style>
+body { font-family: sans-serif; padding: 20px; background: #1a2332; color: #fff; }
+button { padding: 15px 25px; font-size: 16px; background: #d13343; color: #fff; border: none; border-radius: 8px; margin: 10px 0; cursor: pointer; }
+#log { background: #000; padding: 15px; border-radius: 8px; margin-top: 20px; font-family: monospace; font-size: 13px; white-space: pre-wrap; min-height: 200px; }
+.ok { color: #4ade80; }
+.err { color: #f87171; }
+</style>
+</head>
+<body>
+<h2>🧪 Prueba de guardado de fotos (v2)</h2>
+<p>Envía una foto de prueba a Drive con el método form+iframe.</p>
+<button onclick="probar()">📤 Enviar foto de prueba a Drive</button>
+<button onclick="consultar()">🔍 Ver si se guardó</button>
+<div id="log">Esperando...</div>
+
+<script>
+const FOTOS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyuZc9zBKKt9p0hIy6r48Is_CiurIENrutDrwPaPsVmKhmmm8Kp1CTZWx4t8wJ-uJmU/exec";
+
+function log(msg, tipo) {
+  const el = document.getElementById('log');
+  const clase = tipo === 'ok' ? 'ok' : (tipo === 'err' ? 'err' : '');
+  el.innerHTML += '\n<span class="' + clase + '">' + msg + '</span>';
+}
+
+function fotoDePrueba() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 200; canvas.height = 200;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#d13343';
+  ctx.fillRect(0, 0, 200, 200);
+  ctx.fillStyle = '#fff';
+  ctx.font = '20px sans-serif';
+  ctx.fillText('PRUEBA SIGMA', 30, 100);
+  ctx.fillText(new Date().toLocaleTimeString(), 40, 130);
+  return canvas.toDataURL('image/jpeg', 0.8);
+}
+
+function probar() {
+  document.getElementById('log').innerHTML = 'Iniciando prueba...';
+  const dataUrl = fotoDePrueba();
+  log('✓ Foto generada (' + Math.round(dataUrl.length/1024) + ' KB)', 'ok');
+
+  const iframe = document.createElement('iframe');
+  iframe.name = 'iftest_' + Date.now();
+  iframe.style.display = 'none';
+  document.body.appendChild(iframe);
+
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = FOTOS_SCRIPT_URL;
+  form.target = iframe.name;
+  form.enctype = 'application/x-www-form-urlencoded';
+
+  const campos = { modo:'guardar_foto', sku:'PRUEBA', lote:'260716', dia:'2026-07-16', indice:1, total:1, foto:dataUrl };
+  for (const k in campos) {
+    const t = document.createElement('textarea');
+    t.name = k; t.value = campos[k];
+    form.appendChild(t);
+  }
+  document.body.appendChild(form);
+
+  iframe.onload = () => {
+    log('✓ El servidor respondió (foto enviada)', 'ok');
+    log('', '');
+    log('Espera 3 segundos y dale a "Ver si se guardó"', '');
+  };
+
+  log('→ Enviando...', '');
+  form.submit();
+}
+
+function consultar() {
+  log('', '');
+  log('→ Consultando Drive...', '');
+  const cbName = 'cbT' + Date.now();
+  window[cbName] = function(data) {
+    if (data.result === 'ok' && data.fotos && data.fotos.length > 0) {
+      log('✅ ¡FOTOS ENCONTRADAS! ' + data.fotos.length + ' foto(s)', 'ok');
+      log('Carpeta: ' + data.carpeta, '');
+    } else {
+      log('✗ No hay fotos guardadas todavía', 'err');
+      log(JSON.stringify(data), '');
+    }
+  };
+  const s = document.createElement('script');
+  s.src = FOTOS_SCRIPT_URL + '?modo=ver_fotos&sku=PRUEBA&lote=260716&dia=2026-07-16&callback=' + cbName;
+  s.onerror = () => log('✗ No se pudo consultar', 'err');
+  document.body.appendChild(s);
+}
+</script>
+</body>
+</html>
