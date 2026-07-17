@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet"><title>Producción Diaria — Aseguramiento de Calidad</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet"><script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script><title>Producción Diaria — Aseguramiento de Calidad</title>
 <meta name="theme-color" content="#1a2332">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -343,6 +343,17 @@ body {
   padding: 2px 7px; border-radius: 5px;
 }
 
+
+.reb-var {
+  background: var(--gris-suave); border: 1px solid var(--gris-linea);
+  border-left: 3px solid var(--dorado); border-radius: 10px;
+  padding: 14px; margin-bottom: 14px;
+}
+.reb-var-title { font-size: 13px; font-weight: 800; color: var(--tinta); margin-bottom: 4px; }
+.reb-var-est { font-size: 11px; color: var(--texto-dim); margin-bottom: 12px; font-style: italic; line-height: 1.4; }
+.reb-var .field { margin-bottom: 10px; }
+.reb-var .field:last-child { margin-bottom: 0; }
+
 </style>
 </head>
 <body>
@@ -365,6 +376,7 @@ body {
 
   <div class="tabs">
     <button class="tab active" data-tab="registrar" onclick="setTab('registrar')">📝 Registrar</button>
+    <button class="tab" data-tab="rebanado" onclick="setTab('rebanado')">🔪 Rebanado</button>
     <button class="tab" data-tab="consultar" onclick="setTab('consultar')">🔍 Consultar</button>
   </div>
 
@@ -530,6 +542,161 @@ body {
     <div id="consulta-results"></div>
   </div>
 
+  <div id="panel-rebanado" class="panel-card hidden">
+    <div class="section-title">🏷️ Datos de Rebanado</div>
+    <div class="field sku-wrapper">
+      <label>SKU <span class="required">*</span></label>
+      <input id="reb-sku" type="text" placeholder="SKU o nombre…" autocomplete="off">
+      <div id="reb-sku-sugg" class="suggestions"></div>
+    </div>
+    <div class="field auto-field">
+      <label>📦 Producto</label>
+      <input id="reb-sku-desc" type="text" readonly placeholder="Se completa solo">
+    </div>
+    <div class="field-row">
+      <div class="field auto-field">
+        <label>⏳ Vida útil</label>
+        <input id="reb-vida" type="text" readonly>
+      </div>
+      <div class="field">
+        <label>🏷️ Lote final (AAMMDD)</label>
+        <input id="reb-lote" type="text" inputmode="numeric" placeholder="Ej. 260714" oninput="calcVencReb()">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field auto-field">
+        <label>📅 Fecha de vencimiento</label>
+        <input id="reb-venc" type="text" readonly>
+      </div>
+      <div class="field">
+        <label>🏷️ Lote interno</label>
+        <input id="reb-lote-interno" type="text" placeholder="Ej. Z070714">
+      </div>
+    </div>
+
+    <div class="section-title">📋 Encabezado del Control</div>
+    <div class="field-row">
+      <div class="field">
+        <label>📅 Fecha</label>
+        <input id="reb-fecha" type="date">
+      </div>
+      <div class="field auto-field">
+        <label>🕐 Hora de inspección</label>
+        <input id="reb-hora" type="text" readonly>
+      </div>
+    </div>
+    <div class="field auto-field">
+      <label>👤 Realizado por</label>
+      <input id="reb-realizado" type="text" value="Ismael Acevedo" readonly>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Nombre del equipo</label>
+        <input id="reb-equipo" type="text" placeholder="Máquina">
+      </div>
+      <div class="field">
+        <label>Producto verificado</label>
+        <input id="reb-producto" type="text" placeholder="Producto / SKU">
+      </div>
+    </div>
+
+    <div class="section-title">🔬 Variables Críticas (10 tomas c/u)</div>
+
+    <div class="reb-var">
+      <div class="reb-var-title">1. Aspersión de túneles de desinfección</div>
+      <div class="reb-var-est">Estándar: espreas asperjen sobre las piezas / aspecto sin residuos · Unidad: PPM</div>
+      <div class="field">
+        <label>Concentración (PPM)</label>
+        <input id="v1-unico" class="peso-input" type="number" step="any" inputmode="decimal" placeholder="PPM" style="text-align:center; font-size:16px;">
+      </div>
+    </div>
+    </div>
+    <div class="reb-var">
+      <div class="reb-var-title">2. Temperatura antes de rebanar</div>
+      <div class="reb-var-est">Estándar: Producto atemperado de 0°C a -4°C · Unidad: °C</div>
+      <div class="pesos-grid">
+        <div><span class="peso-label">1</span><input class="peso-input v2-medida" type="text" inputmode="text" pattern="-?[0-9]*[.,]?[0-9]*" oninput="calcReb('v2')"></div><div><span class="peso-label">2</span><input class="peso-input v2-medida" type="text" inputmode="text" pattern="-?[0-9]*[.,]?[0-9]*" oninput="calcReb('v2')"></div><div><span class="peso-label">3</span><input class="peso-input v2-medida" type="text" inputmode="text" pattern="-?[0-9]*[.,]?[0-9]*" oninput="calcReb('v2')"></div><div><span class="peso-label">4</span><input class="peso-input v2-medida" type="text" inputmode="text" pattern="-?[0-9]*[.,]?[0-9]*" oninput="calcReb('v2')"></div><div><span class="peso-label">5</span><input class="peso-input v2-medida" type="text" inputmode="text" pattern="-?[0-9]*[.,]?[0-9]*" oninput="calcReb('v2')"></div><div><span class="peso-label">6</span><input class="peso-input v2-medida" type="text" inputmode="text" pattern="-?[0-9]*[.,]?[0-9]*" oninput="calcReb('v2')"></div><div><span class="peso-label">7</span><input class="peso-input v2-medida" type="text" inputmode="text" pattern="-?[0-9]*[.,]?[0-9]*" oninput="calcReb('v2')"></div><div><span class="peso-label">8</span><input class="peso-input v2-medida" type="text" inputmode="text" pattern="-?[0-9]*[.,]?[0-9]*" oninput="calcReb('v2')"></div><div><span class="peso-label">9</span><input class="peso-input v2-medida" type="text" inputmode="text" pattern="-?[0-9]*[.,]?[0-9]*" oninput="calcReb('v2')"></div><div><span class="peso-label">10</span><input class="peso-input v2-medida" type="text" inputmode="text" pattern="-?[0-9]*[.,]?[0-9]*" oninput="calcReb('v2')"></div>
+      </div>
+      <div class="pesos-stats">
+        <div><div class="stat-label">Promedio</div><div class="stat-value" id="v2-prom">—</div></div>
+        <div><div class="stat-label">Mínimo</div><div class="stat-value" id="v2-min">—</div></div>
+        <div><div class="stat-label">Máximo</div><div class="stat-value" id="v2-max">—</div></div>
+        <div><div class="stat-label">Llenados</div><div class="stat-value" id="v2-cnt">0/10</div></div>
+      </div>
+    </div>
+    <div class="reb-var">
+      <div class="reb-var-title">3. R.P.M. de rebanado</div>
+      <div class="reb-var-est">Estándar: según LI CRC IP 21 · Unidad: RPM</div>
+      <div class="field">
+        <label>RPM programado</label>
+        <input id="v3-unico" class="peso-input" type="number" step="any" inputmode="decimal" placeholder="RPM" style="text-align:center; font-size:16px;">
+      </div>
+    </div>
+    </div>
+    <div class="reb-var">
+      <div class="reb-var-title">4. Peso de producto rebanado</div>
+      <div class="reb-var-est">Estándar: Según LI CRC IP 21 (10 copos con romana) · Unidad: gramos</div>
+      <div class="pesos-grid">
+        <div><span class="peso-label">1</span><input class="peso-input v4-medida" type="number" step="any" inputmode="decimal" oninput="calcReb('v4')"></div><div><span class="peso-label">2</span><input class="peso-input v4-medida" type="number" step="any" inputmode="decimal" oninput="calcReb('v4')"></div><div><span class="peso-label">3</span><input class="peso-input v4-medida" type="number" step="any" inputmode="decimal" oninput="calcReb('v4')"></div><div><span class="peso-label">4</span><input class="peso-input v4-medida" type="number" step="any" inputmode="decimal" oninput="calcReb('v4')"></div><div><span class="peso-label">5</span><input class="peso-input v4-medida" type="number" step="any" inputmode="decimal" oninput="calcReb('v4')"></div><div><span class="peso-label">6</span><input class="peso-input v4-medida" type="number" step="any" inputmode="decimal" oninput="calcReb('v4')"></div><div><span class="peso-label">7</span><input class="peso-input v4-medida" type="number" step="any" inputmode="decimal" oninput="calcReb('v4')"></div><div><span class="peso-label">8</span><input class="peso-input v4-medida" type="number" step="any" inputmode="decimal" oninput="calcReb('v4')"></div><div><span class="peso-label">9</span><input class="peso-input v4-medida" type="number" step="any" inputmode="decimal" oninput="calcReb('v4')"></div><div><span class="peso-label">10</span><input class="peso-input v4-medida" type="number" step="any" inputmode="decimal" oninput="calcReb('v4')"></div>
+      </div>
+      <div class="pesos-stats">
+        <div><div class="stat-label">Promedio</div><div class="stat-value" id="v4-prom">—</div></div>
+        <div><div class="stat-label">Mínimo</div><div class="stat-value" id="v4-min">—</div></div>
+        <div><div class="stat-label">Máximo</div><div class="stat-value" id="v4-max">—</div></div>
+        <div><div class="stat-label">Llenados</div><div class="stat-value" id="v4-cnt">0/10</div></div>
+      </div>
+    </div>
+    <div class="reb-var">
+      <div class="reb-var-title">5. Grosor de rebanado</div>
+      <div class="reb-var-est">Estándar: Según LI CRC IP 21 (pie de rey) · Unidad: mm</div>
+      <div class="pesos-grid">
+        <div><span class="peso-label">1</span><input class="peso-input v5-medida" type="number" step="any" inputmode="decimal" oninput="calcReb('v5')"></div><div><span class="peso-label">2</span><input class="peso-input v5-medida" type="number" step="any" inputmode="decimal" oninput="calcReb('v5')"></div><div><span class="peso-label">3</span><input class="peso-input v5-medida" type="number" step="any" inputmode="decimal" oninput="calcReb('v5')"></div><div><span class="peso-label">4</span><input class="peso-input v5-medida" type="number" step="any" inputmode="decimal" oninput="calcReb('v5')"></div><div><span class="peso-label">5</span><input class="peso-input v5-medida" type="number" step="any" inputmode="decimal" oninput="calcReb('v5')"></div><div><span class="peso-label">6</span><input class="peso-input v5-medida" type="number" step="any" inputmode="decimal" oninput="calcReb('v5')"></div><div><span class="peso-label">7</span><input class="peso-input v5-medida" type="number" step="any" inputmode="decimal" oninput="calcReb('v5')"></div><div><span class="peso-label">8</span><input class="peso-input v5-medida" type="number" step="any" inputmode="decimal" oninput="calcReb('v5')"></div><div><span class="peso-label">9</span><input class="peso-input v5-medida" type="number" step="any" inputmode="decimal" oninput="calcReb('v5')"></div><div><span class="peso-label">10</span><input class="peso-input v5-medida" type="number" step="any" inputmode="decimal" oninput="calcReb('v5')"></div>
+      </div>
+      <div class="pesos-stats">
+        <div><div class="stat-label">Promedio</div><div class="stat-value" id="v5-prom">—</div></div>
+        <div><div class="stat-label">Mínimo</div><div class="stat-value" id="v5-min">—</div></div>
+        <div><div class="stat-label">Máximo</div><div class="stat-value" id="v5-max">—</div></div>
+        <div><div class="stat-label">Llenados</div><div class="stat-value" id="v5-cnt">0/10</div></div>
+      </div>
+    </div>
+    <div class="reb-var">
+      <div class="reb-var-title">6. Acomodo del producto</div>
+      <div class="reb-var-est">Estándar: Escala del 4 al 7 (rechazo 4, aceptación 7) · Unidad: valor 4-7</div>
+      <div class="pesos-grid">
+        <div><span class="peso-label">1</span><input class="peso-input v6-medida" type="number" step="any" inputmode="decimal" oninput="calcReb('v6')"></div><div><span class="peso-label">2</span><input class="peso-input v6-medida" type="number" step="any" inputmode="decimal" oninput="calcReb('v6')"></div><div><span class="peso-label">3</span><input class="peso-input v6-medida" type="number" step="any" inputmode="decimal" oninput="calcReb('v6')"></div><div><span class="peso-label">4</span><input class="peso-input v6-medida" type="number" step="any" inputmode="decimal" oninput="calcReb('v6')"></div><div><span class="peso-label">5</span><input class="peso-input v6-medida" type="number" step="any" inputmode="decimal" oninput="calcReb('v6')"></div><div><span class="peso-label">6</span><input class="peso-input v6-medida" type="number" step="any" inputmode="decimal" oninput="calcReb('v6')"></div><div><span class="peso-label">7</span><input class="peso-input v6-medida" type="number" step="any" inputmode="decimal" oninput="calcReb('v6')"></div><div><span class="peso-label">8</span><input class="peso-input v6-medida" type="number" step="any" inputmode="decimal" oninput="calcReb('v6')"></div><div><span class="peso-label">9</span><input class="peso-input v6-medida" type="number" step="any" inputmode="decimal" oninput="calcReb('v6')"></div><div><span class="peso-label">10</span><input class="peso-input v6-medida" type="number" step="any" inputmode="decimal" oninput="calcReb('v6')"></div>
+      </div>
+      <div class="pesos-stats">
+        <div><div class="stat-label">Promedio</div><div class="stat-value" id="v6-prom">—</div></div>
+        <div><div class="stat-label">Mínimo</div><div class="stat-value" id="v6-min">—</div></div>
+        <div><div class="stat-label">Máximo</div><div class="stat-value" id="v6-max">—</div></div>
+        <div><div class="stat-label">Llenados</div><div class="stat-value" id="v6-cnt">0/10</div></div>
+      </div>
+    </div>
+
+    <div class="section-title">📷 Evidencia Fotográfica</div>
+    <div class="pesos-banner">📷 Toma fotos de la evidencia del rebanado. Se incluyen en el PDF y se guardan en Google Drive.</div>
+    <div style="display:flex; gap:10px; margin-bottom:10px;">
+      <button type="button" class="btn-foto" onclick="document.getElementById('reb-foto-cam').click()" style="flex:1; padding:12px; border:1.5px solid var(--rojo); background:#fff; color:var(--rojo); border-radius:8px; font-weight:700;">📸 Tomar foto</button>
+      <button type="button" class="btn-foto" onclick="document.getElementById('reb-foto-gal').click()" style="flex:1; padding:12px; border:1.5px solid var(--gris-linea); background:#fff; color:var(--texto); border-radius:8px; font-weight:700;">🖼️ De galería</button>
+    </div>
+    <input id="reb-foto-cam" type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="agregarFotosReb(this.files)">
+    <input id="reb-foto-gal" type="file" accept="image/*" multiple style="display:none" onchange="agregarFotosReb(this.files)">
+    <div id="reb-fotos-preview" class="fotos-preview"></div>
+    <div id="reb-fotos-contador" style="font-size:12px;font-weight:700;text-align:center;margin-bottom:6px;color:#5a6b80;">0 / 15 fotos</div>
+
+    <button type="button" class="btn-submit" onclick="guardarRebanado()">💾 Guardar en Sheets</button>
+    <div style="display:flex; gap:10px; margin-top:12px;">
+      <button type="button" onclick="generarPDFRebanado('descargar')" style="flex:1; padding:15px; background:var(--tinta); color:#fff; border:none; border-radius:10px; font-size:14px; font-weight:800; cursor:pointer;">📄 Descargar PDF</button>
+      <button type="button" onclick="generarPDFRebanado('compartir')" style="flex:1; padding:15px; background:#25D366; color:#fff; border:none; border-radius:10px; font-size:14px; font-weight:800; cursor:pointer;">📱 Compartir PDF</button>
+    </div>
+
+    <div id="reb-success" class="alert-success" style="margin-top:16px;">
+      <div class="icon">✅</div>
+      <div class="title">Informe de Rebanado listo</div>
+      <div class="msg" id="reb-success-detail"></div>
+    </div>
+  </div>
+
   <div class="footer">Aseguramiento de Calidad · Sigma Costa Rica</div>
 </div>
 
@@ -598,6 +765,8 @@ function setTab(tab){
   document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
   document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
   document.getElementById('panel-registrar').classList.toggle('hidden', tab !== 'registrar');
+  document.getElementById('panel-rebanado').classList.toggle('hidden', tab !== 'rebanado');
+  if (tab === 'rebanado') initRebanado();
   document.getElementById('panel-consultar').classList.toggle('hidden', tab !== 'consultar');
 }
 
@@ -1467,6 +1636,306 @@ window.addEventListener('load', () => {
   v.style.cssText = 'position:fixed;bottom:4px;right:6px;font-size:9px;color:#94a3b8;z-index:9999;opacity:0.6;';
   document.body.appendChild(v);
 });
+
+// ═══════════ REBANADO ═══════════
+let fotosRebanado = [];
+
+// Poner hora automática al abrir la pestaña rebanado
+function initRebanado() {
+  const h = document.getElementById('reb-hora');
+  if (h && !h.value) h.value = nowTime();
+  const f = document.getElementById('reb-fecha');
+  if (f && !f.value) {
+    const hoy = new Date();
+    f.value = hoy.getFullYear() + '-' + String(hoy.getMonth()+1).padStart(2,'0') + '-' + String(hoy.getDate()).padStart(2,'0');
+  }
+}
+
+async function agregarFotosReb(files) {
+  for (const file of files) {
+    if (!file.type.startsWith('image/')) continue;
+    if (fotosRebanado.length >= MAX_FOTOS) { alert('Máximo ' + MAX_FOTOS + ' fotos.'); break; }
+    const dataUrl = await comprimirImagen(file);
+    fotosRebanado.push({ dataUrl });
+  }
+  renderFotosReb();
+  document.getElementById('reb-foto-cam').value = '';
+  document.getElementById('reb-foto-gal').value = '';
+}
+
+function renderFotosReb() {
+  const cont = document.getElementById('reb-fotos-preview');
+  cont.innerHTML = fotosRebanado.map((f, i) => `
+    <div class="foto-item">
+      <img src="${f.dataUrl}" alt="Foto ${i+1}">
+      <button type="button" class="quitar" onclick="quitarFotoReb(${i})">×</button>
+      <span class="num">${i+1}</span>
+    </div>`).join('');
+  const c = document.getElementById('reb-fotos-contador');
+  if (c) c.textContent = fotosRebanado.length + ' / ' + MAX_FOTOS + ' fotos';
+}
+function quitarFotoReb(i) { fotosRebanado.splice(i, 1); renderFotosReb(); }
+
+// Calcula promedio/mín/máx de una variable (10 tomas)
+function calcReb(vid) {
+  const inputs = document.querySelectorAll('.' + vid + '-medida');
+  const vals = [];
+  inputs.forEach(el => {
+    // Aceptar coma o punto decimal, y el signo menos
+    const limpio = String(el.value).trim().replace(',', '.');
+    const v = parseFloat(limpio);
+    if (!isNaN(v)) vals.push(v);
+  });
+  const prom = vals.length ? (vals.reduce((a,b)=>a+b,0)/vals.length) : null;
+  const min = vals.length ? Math.min(...vals) : null;
+  const max = vals.length ? Math.max(...vals) : null;
+  document.getElementById(vid+'-prom').textContent = prom!==null ? prom.toFixed(2) : '—';
+  document.getElementById(vid+'-min').textContent = min!==null ? min.toFixed(2) : '—';
+  document.getElementById(vid+'-max').textContent = max!==null ? max.toFixed(2) : '—';
+  document.getElementById(vid+'-cnt').textContent = vals.length + '/10';
+  return { vals, prom, min, max };
+}
+
+const VARS_REB = [
+  { id:'v1', n:'Aspersión de túneles de desinfección', u:'ppm/lectura' },
+  { id:'v2', n:'Temperatura antes de rebanar', u:'°C' },
+  { id:'v3', n:'R.P.M. de rebanado', u:'RPM' },
+  { id:'v4', n:'Peso de producto rebanado', u:'g' },
+  { id:'v5', n:'Grosor de rebanado', u:'mm' },
+  { id:'v6', n:'Acomodo del producto', u:'4-7' }
+];
+
+function datosRebanado() {
+  const g = id => (document.getElementById(id)?.value || '').trim();
+  const variables = VARS_REB.map(v => {
+    // v1 (Aspersión) y v3 (RPM) son campo único
+    if (v.id === 'v1' || v.id === 'v3') {
+      const val = g(v.id + '-unico');
+      return { nombre: v.n, unidad: v.u, unico: true, valorUnico: val, valores: val ? [parseFloat(val)] : [], prom: null, min: null, max: null };
+    }
+    const c = calcReb(v.id);
+    return { nombre: v.n, unidad: v.u, unico: false, valores: c.vals, prom: c.prom, min: c.min, max: c.max };
+  });
+  return {
+    sku: g('reb-sku'), skuDesc: g('reb-sku-desc'), vida: g('reb-vida'),
+    lote: g('reb-lote'), venc: g('reb-venc'), loteInterno: g('reb-lote-interno'),
+    fecha: g('reb-fecha'), realizado: g('reb-realizado') || 'Ismael Acevedo',
+    hora: g('reb-hora'), equipo: g('reb-equipo'), producto: g('reb-producto'),
+    variables
+  };
+}
+
+function guardarRebanado() {
+  const d = datosRebanado();
+  if (!d.fecha && !d.producto) { alert('Completa al menos la fecha y el producto.'); return; }
+  const det = document.getElementById('reb-success-detail');
+  det.innerHTML = 'Guardando...';
+  document.getElementById('reb-success').classList.add('show');
+
+  if (APPS_SCRIPT_URL) {
+    const params = new URLSearchParams();
+    params.append('modo', 'guardar_rebanado');
+    params.append('fecha', d.fecha); params.append('realizado', d.realizado);
+    params.append('hora', d.hora); params.append('equipo', d.equipo); params.append('producto', d.producto);
+    params.append('sku', d.sku); params.append('sku_desc', d.skuDesc); params.append('vida', d.vida);
+    params.append('lote', d.lote); params.append('venc', d.venc); params.append('lote_interno', d.loteInterno);
+    d.variables.forEach((v, i) => {
+      if (v.unico) {
+        params.append('v'+(i+1)+'_valores', v.valorUnico || '');
+        params.append('v'+(i+1)+'_prom', ''); params.append('v'+(i+1)+'_min', ''); params.append('v'+(i+1)+'_max', '');
+      } else {
+        params.append('v'+(i+1)+'_valores', v.valores.join(', '));
+        params.append('v'+(i+1)+'_prom', v.prom!==null?v.prom.toFixed(2):'');
+        params.append('v'+(i+1)+'_min', v.min!==null?v.min.toFixed(2):'');
+        params.append('v'+(i+1)+'_max', v.max!==null?v.max.toFixed(2):'');
+      }
+    });
+    fetch(APPS_SCRIPT_URL, { method:'POST', mode:'no-cors',
+      headers:{'Content-Type':'text/plain;charset=utf-8'}, body: params.toString() })
+      .catch(e => console.log('reb save:', e));
+  }
+
+  if (fotosRebanado.length > 0) {
+    const fotos = fotosRebanado.slice();
+    det.innerHTML = 'Guardado ✓ · Subiendo ' + fotos.length + ' foto(s)...';
+    enviarFotosADriveLista(fotos, 'REBANADO', d.producto || 'rebanado', d.fecha)
+      .then(() => { det.innerHTML = 'Guardado ✓ · Fotos subidas ✓'; });
+  } else {
+    det.innerHTML = 'Guardado en Sheets ✓';
+  }
+}
+
+// ── Generar PDF profesional del informe ──
+async function generarPDFRebanado(accion) {
+  const d = datosRebanado();
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const W = 210;
+  let y = 15;
+
+  // Encabezado con franja
+  doc.setFillColor(26, 35, 50);
+  doc.rect(0, 0, W, 28, 'F');
+  doc.setFillColor(209, 51, 67);
+  doc.rect(0, 28, W, 1.5, 'F');
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(16); doc.setFont(undefined, 'bold');
+  doc.text('PLAN DE CONTROL - REBANADO', W/2, 13, { align:'center' });
+  doc.setFontSize(9); doc.setFont(undefined, 'normal');
+  doc.setTextColor(245, 166, 35);
+  doc.text('PL CRC IP 12  ·  Aseguramiento de Calidad - Sigma', W/2, 21, { align:'center' });
+
+  y = 38;
+  doc.setTextColor(26,35,50);
+  doc.setFontSize(10); doc.setFont(undefined,'bold');
+  doc.text('DATOS DEL CONTROL', 14, y); y += 6;
+  doc.setFont(undefined,'normal'); doc.setFontSize(9);
+  const enc = [
+    ['Fecha:', d.fecha || '—', 'Hora:', d.hora || '—'],
+    ['Realizado por:', d.realizado || '—', 'Equipo:', d.equipo || '—'],
+    ['SKU:', d.sku || '—', 'Producto:', d.skuDesc || d.producto || '—'],
+    ['Lote final:', d.lote || '—', 'Vencimiento:', d.venc || '—'],
+    ['Lote interno:', d.loteInterno || '—', 'Vida útil:', d.vida || '—']
+  ];
+  enc.forEach(fila => {
+    doc.setFont(undefined,'bold'); doc.text(fila[0], 14, y);
+    doc.setFont(undefined,'normal'); doc.text(String(fila[1]), 42, y);
+    if (fila[2]) { doc.setFont(undefined,'bold'); doc.text(fila[2], 110, y);
+      doc.setFont(undefined,'normal'); doc.text(String(fila[3]), 135, y); }
+    y += 6;
+  });
+  y += 4;
+
+  // Tabla de variables
+  doc.setFont(undefined,'bold'); doc.setFontSize(10);
+  doc.text('VARIABLES CRÍTICAS', 14, y); y += 2;
+  doc.setDrawColor(245,166,35); doc.setLineWidth(0.5); doc.line(14, y, 60, y); y += 6;
+
+  doc.setFontSize(8);
+  d.variables.forEach((v, i) => {
+    if (y > 250) { doc.addPage(); y = 20; }
+    doc.setFillColor(246, 248, 250);
+    doc.rect(14, y-4, W-28, 16, 'F');
+    doc.setFont(undefined,'bold'); doc.setTextColor(26,35,50);
+    doc.text((i+1) + '. ' + v.nombre + ' (' + v.unidad + ')', 16, y);
+    y += 5;
+    doc.setFont(undefined,'normal'); doc.setTextColor(60,60,60);
+    if (v.unico) {
+      doc.text('Valor: ' + (v.valorUnico || 'Sin datos') + ' ' + v.unidad, 16, y);
+      y += 5;
+    } else {
+      const tomas = v.valores.length ? v.valores.join(', ') : 'Sin datos';
+      const tomasLines = doc.splitTextToSize('Tomas: ' + tomas, W-34);
+      doc.text(tomasLines, 16, y);
+      y += tomasLines.length * 4;
+      if (v.prom !== null) {
+        doc.setFont(undefined,'bold'); doc.setTextColor(209,51,67);
+        doc.text('Prom: ' + v.prom.toFixed(2) + '   Mín: ' + v.min.toFixed(2) + '   Máx: ' + v.max.toFixed(2), 16, y);
+        y += 5;
+      }
+    }
+    doc.setTextColor(60,60,60);
+    y += 3;
+  });
+
+  // Fotos de evidencia
+  if (fotosRebanado.length > 0) {
+    doc.addPage(); y = 20;
+    doc.setFontSize(12); doc.setFont(undefined,'bold'); doc.setTextColor(26,35,50);
+    doc.text('EVIDENCIA FOTOGRÁFICA', 14, y); y += 8;
+    let x = 14; const imgW = 88, imgH = 66, gap = 6;
+    for (let i = 0; i < fotosRebanado.length; i++) {
+      if (y + imgH > 280) { doc.addPage(); y = 20; x = 14; }
+      try { doc.addImage(fotosRebanado[i].dataUrl, 'JPEG', x, y, imgW, imgH); } catch(e){}
+      doc.setFontSize(8); doc.setTextColor(100,100,100);
+      doc.text('Foto ' + (i+1), x, y + imgH + 4);
+      if (x + imgW*2 + gap < W) { x += imgW + gap; }
+      else { x = 14; y += imgH + 12; }
+    }
+  }
+
+  // Pie de página
+  const paginas = doc.internal.getNumberOfPages();
+  for (let p = 1; p <= paginas; p++) {
+    doc.setPage(p);
+    doc.setFontSize(7); doc.setTextColor(150,150,150);
+    doc.text('Sigma - Aseguramiento de Calidad · Generado ' + new Date().toLocaleString(), W/2, 292, { align:'center' });
+  }
+
+  const nombreArch = 'Rebanado_' + (d.producto||'informe').replace(/[^0-9A-Za-z]/g,'_') + '_' + (d.fecha||'') + '.pdf';
+
+  if (accion === 'compartir' && navigator.share && navigator.canShare) {
+    const blob = doc.output('blob');
+    const file = new File([blob], nombreArch, { type: 'application/pdf' });
+    if (navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: 'Informe Rebanado', text: 'Informe de Control de Rebanado - Sigma' });
+        return;
+      } catch(e) { /* si cancela, no hacer nada */ return; }
+    }
+  }
+  // Descargar (o fallback si no soporta compartir archivos)
+  doc.save(nombreArch);
+  if (accion === 'compartir') {
+    alert('Tu dispositivo no permite compartir el PDF directamente. Se descargó; adjúntalo manualmente en WhatsApp.');
+  }
+}
+
+
+// ═══════════ DATOS DE REBANADO (SKU auto + vencimiento) ═══════════
+let rebSkuSel = null;
+
+const rebSkuInput = document.getElementById('reb-sku');
+if (rebSkuInput) {
+  rebSkuInput.addEventListener('input', function() {
+    const q = this.value.trim().toLowerCase();
+    const sugg = document.getElementById('reb-sku-sugg');
+    if (q.length < 1) { sugg.classList.remove('show'); return; }
+    const matches = SKUS.filter(s =>
+      String(s.sku).toLowerCase().includes(q) ||
+      (s.descripcion || '').toLowerCase().includes(q)
+    ).slice(0, 8);
+    if (matches.length === 0) { sugg.classList.remove('show'); return; }
+    sugg.innerHTML = matches.map(s =>
+      `<div class="suggestion-item" onclick="aplicarRebSku('${s.sku}')">
+        <span class="sku-code">${s.sku}</span>${s.descripcion || ''}
+      </div>`).join('');
+    sugg.classList.add('show');
+
+    // Coincidencia exacta
+    const exacto = SKUS.find(s => String(s.sku).toLowerCase() === q);
+    if (exacto) aplicarRebSku(exacto.sku, true);
+  });
+}
+
+function aplicarRebSku(sku, mantenerFoco) {
+  const data = SKUS.find(s => String(s.sku) === String(sku));
+  if (!data) return;
+  rebSkuSel = data;
+  document.getElementById('reb-sku').value = data.sku;
+  document.getElementById('reb-sku-desc').value = data.descripcion || '';
+  document.getElementById('reb-vida').value = (data.vida_util || '') + ' días';
+  if (!mantenerFoco) document.getElementById('reb-sku-sugg').classList.remove('show');
+  // También pasar el producto al encabezado del control
+  const prod = document.getElementById('reb-producto');
+  if (prod && !prod.value) prod.value = data.descripcion || '';
+  calcVencReb();
+}
+
+function calcVencReb() {
+  const lote = document.getElementById('reb-lote').value.trim();
+  const out = document.getElementById('reb-venc');
+  if (!lote || !rebSkuSel) { out.value = ''; return; }
+  const fechaLote = parseLote(lote);
+  if (!fechaLote) { out.value = '⚠️ Lote inválido'; return; }
+  const vida = parseInt(rebSkuSel.vida_util, 10);
+  if (!isNaN(vida)) {
+    out.value = fmtDate(new Date(fechaLote.getTime() + vida * 86400000));
+  } else {
+    out.value = '';
+  }
+}
+
 </script>
 </body>
 </html>
